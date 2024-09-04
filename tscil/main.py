@@ -20,7 +20,7 @@ if __name__ == "__main__":
                         choices=['class', 'domain'],
                         help='Scenario of the task steam. Current codes only include class-il')
 
-    parser.add_argument('--stream_split', type=str, default='all',
+    parser.add_argument('--stream_split', type=str, default='exp',
                         choices=['val', 'exp', 'all'],
                         help='The split of the tasks stream: val tasks, exp tasks or all the tasks')
 
