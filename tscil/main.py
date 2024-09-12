@@ -11,7 +11,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train the continual learning agent on task sequence')
 
     # #################### Main setting for the experiment ####################
-    parser.add_argument('--agent', dest='agent', default='SFT', type=str,
+    parser.add_argument('--agent', dest='agent', default='L2P', type=str,
                         choices=['SFT', 'Offline', 'L2P'],
                         help='Continual learning agent')
 
@@ -24,7 +24,7 @@ if __name__ == "__main__":
                         choices=['val', 'exp', 'all'],
                         help='The split of the tasks stream: val tasks, exp tasks or all the tasks')
 
-    parser.add_argument('--data', dest='data', default='uwave', type=str,
+    parser.add_argument('--data', dest='data', default='wisdm', type=str,
                         choices=['har', 'uwave', 'dailysports', 'grabmyo', 'wisdm',
                                  'ninapro', 'sines'])
 
@@ -41,15 +41,16 @@ if __name__ == "__main__":
                         choices=['Linear', 'CosineLinear', 'SplitCosineLinear'])
     parser.add_argument('--criterion', dest='criterion', default='CE', type=str,
                         choices=['CE', 'BCE'])  # Main classification loss and activation of head
-    parser.add_argument('--ncm_classifier', dest='ncm_classifier', type=boolean_string, default=False,
-                        help='Use NCM classifier or not. Only work for ER-based methods.')
+    parser.add_argument('--use_prototype', dest='use_prototype', type=boolean_string, default=True,
+                        help='Use class prototype for classification.')
+    parser.add_argument('--freeze_old_cls_weights', default=False, type=bool, )
 
     # General params
     parser.add_argument('--runs', dest='runs', default=1, type=int,
                         help='Number of runs')
-    parser.add_argument('--epochs', dest='epochs', default=100, type=int,
+    parser.add_argument('--epochs', dest='epochs', default=1, type=int,
                         help='Number of epochs')
-    parser.add_argument('--batch_size', dest='batch_size', type=int, default=64,
+    parser.add_argument('--batch_size', dest='batch_size', type=int, default=32,
                         help='Batch size')
     parser.add_argument('--lr', dest='lr', default=1e-3, type=float,
                         help='Learning rate')
@@ -76,6 +77,23 @@ if __name__ == "__main__":
                         help='Visualize the feature space of generator with TSNE')
 
     # ######################## Methods-related params ###########################
+    parser.add_argument('--prompt_pool', default=True, type=bool,)
+    parser.add_argument('--pool_size', default=10, type=int,)
+    parser.add_argument('--prompt_length', default=5,type=int, )
+    parser.add_argument('--top_k', default=5, type=int, )
+    parser.add_argument('--prompt_key', default=True, type=bool,)
+    parser.add_argument('--prompt_key_init', default='uniform', type=str)
+    parser.add_argument('--use_prompt_mask', default=False, type=bool)
+    parser.add_argument('--batchwise_prompt', default=True, type=bool)
+    parser.add_argument('--embedding_key', default='cls', type=str)
+
+    # USed in engine.py
+    parser.add_argument('--shared_prompt_pool', default=False, type=bool)
+    parser.add_argument('--shared_prompt_key', default=False, type=bool)
+    parser.add_argument('--pull_constraint', default=True)
+    parser.add_argument('--pull_constraint_coeff', default=0.1, type=float)
+
+
     args = parser.parse_args()
     args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 

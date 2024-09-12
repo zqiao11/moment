@@ -37,7 +37,9 @@ class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
         self.verbose = args.verbose
         self.tsne = args.tsne
         self.cf_matrix = args.cf_matrix
+        self.use_prototype = args.use_prototype
 
+        # ZZ: Ignore these args for now
         self.buffer = None
         self.teacher = None
         self.use_kd = False
@@ -58,6 +60,13 @@ class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
 
         if self.cf_matrix:
             self.y_pred_cf, self.y_true_cf = [], []  # Collected results for Confusion matrix
+
+        self.freeze_old_cls_weights = args.freeze_old_cls_weights
+        self.update_model = True
+
+        if args.use_prototype:
+            self.prototype = None
+            self.update_model = False
 
     def before_task(self, y_train):
         """
@@ -102,32 +111,34 @@ class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
         (x_train, y_train), (x_val, y_val), _ = task
 
         self.before_task(y_train)
-        train_dataloader = Dataloader_from_numpy(x_train, y_train, self.batch_size, shuffle=True)
-        val_dataloader = Dataloader_from_numpy(x_val, y_val, self.batch_size, shuffle=False)
-        early_stopping = EarlyStopping(path=self.ckpt_path, patience=self.args.patience, mode='min', verbose=False)
-        self.scheduler = lr_scheduler.OneCycleLR(optimizer=self.optimizer,
-                                                 steps_per_epoch=len(train_dataloader),
-                                                 epochs=self.epochs,
-                                                 max_lr=self.args.lr)
 
-        for epoch in range(self.epochs):
-            # Train for one epoch
-            epoch_loss_train, epoch_acc_train = self.train_epoch(train_dataloader, epoch=epoch)
+        if self.update_model:
+            train_dataloader = Dataloader_from_numpy(x_train, y_train, self.batch_size, shuffle=True)
+            val_dataloader = Dataloader_from_numpy(x_val, y_val, self.batch_size, shuffle=False)
+            early_stopping = EarlyStopping(path=self.ckpt_path, patience=self.args.patience, mode='min', verbose=False)
+            self.scheduler = lr_scheduler.OneCycleLR(optimizer=self.optimizer,
+                                                     steps_per_epoch=len(train_dataloader),
+                                                     epochs=self.epochs,
+                                                     max_lr=self.args.lr)
 
-            # Test on val set for early stop
-            epoch_loss_val, epoch_acc_val = self.cross_entropy_epoch_run(val_dataloader, mode='val')
+            for epoch in range(self.epochs):
+                # Train for one epoch
+                epoch_loss_train, epoch_acc_train = self.train_epoch(train_dataloader, epoch=epoch)
 
-            if self.args.lradj != 'TST':
-                adjust_learning_rate(self.optimizer, self.scheduler, epoch + 1, self.args)
+                # Test on val set for early stop
+                epoch_loss_val, epoch_acc_val = self.cross_entropy_epoch_run(val_dataloader, mode='val')
 
-            if self.verbose:
-                self.epoch_loss_printer(epoch, epoch_acc_train, epoch_loss_train)
+                if self.args.lradj != 'TST':
+                    adjust_learning_rate(self.optimizer, self.scheduler, epoch + 1, self.args)
 
-            early_stopping(epoch_loss_val, self.model)
-            if early_stopping.early_stop:
                 if self.verbose:
-                    print("Early stopping")
-                break
+                    self.epoch_loss_printer(epoch, epoch_acc_train, epoch_loss_train)
+
+                early_stopping(epoch_loss_val, self.model)
+                if early_stopping.early_stop:
+                    if self.verbose:
+                        print("Early stopping")
+                    break
 
         self.after_task(x_train, y_train)
 
@@ -151,10 +162,10 @@ class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
                 x, y = x.to(self.device), y.to(self.device)
                 self.buffer.update(x, y)
 
-        if self.use_kd:
-            self.teacher = copy.deepcopy(self.model)  # eval()
-            if not self.args.teacher_eval:
-                self.teacher.train()
+        # if self.use_kd:
+        #     self.teacher = copy.deepcopy(self.model)  # eval()
+        #     if not self.args.teacher_eval:
+        #         self.teacher.train()
 
 
     @torch.no_grad()
@@ -195,10 +206,10 @@ class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
                     print('Task {}: Accuracy == {}, Test CE Loss == {} ;'.format(i, eval_acc_i, eval_loss_i))
                 self.Acc_tasks[mode][self.task_now][i] = np.around(eval_acc_i, decimals=2)
 
-                # Use test data to evaluate generator
-                if self.args.agent == 'GR' and self.verbose:
-                    eval_mse_loss, eval_kl_loss = self.generator.evaluate(eval_dataloader_i)
-                    print('        Recons Loss (MAE) == {}, KL Div == {} ;'.format(eval_mse_loss, eval_kl_loss))
+                # # Use test data to evaluate generator
+                # if self.args.agent == 'GR' and self.verbose:
+                #     eval_mse_loss, eval_kl_loss = self.generator.evaluate(eval_dataloader_i)
+                #     print('        Recons Loss (MAE) == {}, KL Div == {} ;'.format(eval_mse_loss, eval_kl_loss))
 
             # Print accuracy matrix of the tasks on this run
             if self.task_now + 1 == self.num_tasks and self.verbose:
@@ -210,9 +221,9 @@ class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
             tsne_path = path + 't{}'.format(self.task_now)
             self.feature_space_tsne_visualization(task_stream, path=tsne_path)
 
-        if self.args.tsne_g and self.args.agent == 'GR' and not self.args.tune:
-            tsne_path = path + 't{}_g'.format(self.task_now)
-            self.feature_space_tsne_visualization(task_stream, path=tsne_path, view_generator=True)
+        # if self.args.tsne_g and self.args.agent == 'GR' and not self.args.tune:
+        #     tsne_path = path + 't{}_g'.format(self.task_now)
+        #     self.feature_space_tsne_visualization(task_stream, path=tsne_path, view_generator=True)
 
     def cross_entropy_epoch_run(self, dataloader, epoch=None, mode='train'):
         """
@@ -247,11 +258,15 @@ class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
                 self.optimizer.zero_grad()
                 outputs = self.model(x, reduction=self.args.reduction)
                 logits = outputs.logits
-                # here is the trick to mask out classes of non-current tasks
-                # Find the classes to mask out (those not in self.classes_in_task)
-                classes_to_mask = np.setdiff1d(np.arange(logits.size(1)), self.classes_in_task)
-                classes_to_mask = torch.tensor(classes_to_mask, dtype=torch.int64).to(logits.device)
-                logits = logits.index_fill(dim=1, index=classes_to_mask, value=float('-inf'))
+
+                if self.freeze_old_cls_weights:
+                    classes_to_mask = np.setdiff1d(np.arange(logits.size(1)), self.classes_in_task)
+                    classes_to_mask = torch.tensor(classes_to_mask, dtype=torch.int64).to(logits.device)
+                    logits = logits.index_fill(dim=1, index=classes_to_mask, value=float('-inf'))
+                else:
+                    if self.num_masked_cls > 0:
+                        logits[:, -self.num_masked_cls:] = float('-inf')
+
                 step_loss = self.criterion(logits, y)
                 step_loss.backward()
                 self.optimizer_step(epoch)
@@ -393,8 +408,10 @@ class SequentialFineTune(BaseLearner):
         super(SequentialFineTune, self).__init__(model, args)
 
     def train_epoch(self, dataloader, epoch):
-        epoch_loss_train, epoch_acc_train = self.cross_entropy_epoch_run(dataloader=dataloader,
-                                                                          epoch=epoch,
-                                                                          mode='train')
+        epoch_loss_train, epoch_acc_train = self.cross_entropy_epoch_run(
+            dataloader=dataloader,
+            epoch=epoch,
+            mode='train'
+        )
         return epoch_loss_train, epoch_acc_train
 

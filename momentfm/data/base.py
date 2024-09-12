@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 import numpy.typing as npt
+import torch
 
 
 @dataclass
@@ -15,3 +16,4 @@ class TimeseriesOutputs:
     embeddings: npt.NDArray = None
     metadata: dict = None
     illegal_output: bool = False
+    reduce_sim: torch.Tensor = None

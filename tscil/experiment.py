@@ -177,7 +177,7 @@ def offline_train_eval(task_stream, run, args):
 
     # Test:
     model.load_state_dict(torch.load(ckpt_path))
-    if args.tune:
+    if args.tune or args.debug:
         os.remove(ckpt_path)  # delete the ckpt to free up disk memory
 
     # Eval on val set
@@ -239,6 +239,9 @@ def experiment_multiple_runs(args):
                     agent.plot_cf_matrix(path=cf_matrix_path, classes=np.arange(task_stream.n_classes))
             Acc_multiple_run_valid.append(agent.Acc_tasks['valid'])
             Acc_multiple_run_test.append(agent.Acc_tasks['test'])
+
+            if args.debug and agent.update_model:
+                os.remove(agent.ckpt_path)  # delete the ckpt to free up disk memory
 
         run_over = time.time()
         print('\n Finish Run {}, running time {} sec'.format(run, run_over - run_start))
