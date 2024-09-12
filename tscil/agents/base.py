@@ -187,7 +187,8 @@ class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
                               'test': np.zeros((self.num_tasks, self.num_tasks))}
 
         # Reload the original optimal model to prevent the changes of statistics in BN layers.
-        self.model.load_state_dict(torch.load(self.ckpt_path))
+        if self.update_model:
+            self.model.load_state_dict(torch.load(self.ckpt_path))
 
         eval_modes = ['valid', 'test']  # 'valid' is for checking generalization.
         for mode in eval_modes:
@@ -200,7 +201,10 @@ class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
                 if self.cf_matrix and self.task_now+1 == self.num_tasks and mode == 'test':  # Collect results for CM
                     eval_loss_i, eval_acc_i = self.test_for_cf_matrix(eval_dataloader_i)
                 else:
-                    eval_loss_i, eval_acc_i = self.cross_entropy_epoch_run(eval_dataloader_i, mode='test')
+                    if self.use_prototype:
+                        eval_loss_i, eval_acc_i = self.test_with_prototype(eval_dataloader_i)
+                    else:
+                        eval_loss_i, eval_acc_i = self.cross_entropy_epoch_run(eval_dataloader_i, mode='test')
 
                 if self.verbose:
                     print('Task {}: Accuracy == {}, Test CE Loss == {} ;'.format(i, eval_acc_i, eval_loss_i))
@@ -286,6 +290,37 @@ class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
 
         epoch_acc = 100. * (correct / total)
         epoch_loss /= (batch_id+1)  # avg loss of a mini batch
+
+        return epoch_loss, epoch_acc
+
+    def test_with_prototype(self, dataloader):
+
+        total = 0
+        correct = 0
+        epoch_loss = None
+
+        for batch_id, (x, y) in enumerate(dataloader):
+            x, y = x.to(self.device), y.to(self.device)
+            x = x.permute(0, 2, 1)  # Moment takes in tensor of shape [batchsize, n_channels, context_length
+            total += y.size(0)
+            if y.size == 1:
+                y.unsqueeze()
+
+            with torch.no_grad():
+                outputs = self.model(x, reduction=self.args.reduction)
+
+                embeddings = outputs.embeddings
+                features = torch.mean(embeddings, dim=1)
+
+                distance = torch.cdist(F.normalize(features, p=2, dim=1),
+                                       F.normalize(self.prototype, p=2, dim=1))
+                outputs = -distance  # select the class with min distance
+
+                # Predict based on features and prototypes
+            prediction = torch.argmax(outputs, dim=1)
+            correct += prediction.eq(y).sum().item()
+
+        epoch_acc = 100. * (correct / total)
 
         return epoch_loss, epoch_acc
 

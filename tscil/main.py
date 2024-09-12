@@ -24,7 +24,7 @@ if __name__ == "__main__":
                         choices=['val', 'exp', 'all'],
                         help='The split of the tasks stream: val tasks, exp tasks or all the tasks')
 
-    parser.add_argument('--data', dest='data', default='wisdm', type=str,
+    parser.add_argument('--data', dest='data', default='uwave', type=str,
                         choices=['har', 'uwave', 'dailysports', 'grabmyo', 'wisdm',
                                  'ninapro', 'sines'])
 
