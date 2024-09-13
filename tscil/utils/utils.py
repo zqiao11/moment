@@ -18,7 +18,11 @@ class Logger(object):
         self.log.write(message)
 
     def flush(self):
-        pass
+        self.terminal.flush()
+        self.log.flush()
+
+    def close(self):
+        self.log.close()    
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
