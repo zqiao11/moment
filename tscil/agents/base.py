@@ -18,7 +18,7 @@ from tscil.utils.utils import EarlyStopping, BinaryCrossEntropy
 from torch.optim import lr_scheduler
 import copy
 from tscil.utils.setup_elements import get_num_classes
-np.random.seed(argparse.Namespace.seed)
+
 
 class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
     def __init__(self, model: nn.Module, args: argparse.Namespace):
@@ -109,8 +109,8 @@ class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
         Basic workflow for learning a task. For particular methods, this function will be overwritten.
         Mini-Dataset is to save time in especially large datasets like grabmyo
         """
-
         (x_train, y_train), (x_val, y_val), _ = task
+        np.random.seed(self.args.seed)
         self.before_task(y_train)
         print(f"训练集比例：{self.args.prop}")
         # ============================mini-Dataset============================

@@ -24,7 +24,7 @@ if __name__ == "__main__":
                         choices=['val', 'exp', 'all'],
                         help='The split of the tasks stream: val tasks, exp tasks or all the tasks')
 
-    parser.add_argument('--data', dest='data', default='uwave', type=str,
+    parser.add_argument('--data', dest='data', default='grabmyo', type=str,
                         choices=['har', 'uwave', 'dailysports', 'grabmyo', 'wisdm',
                                  'ninapro', 'sines'])
 
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     parser.add_argument('--patience', type=int, default=20)
     parser.add_argument('--weight_decay', dest='weight_decay', default=0, type=float, help='weight decay')
     parser.add_argument('--z_score_norm', type=boolean_string, default=False, help='conducting offline z score normalization')
-    parser.add_argument('--prop', type=float, default=1.0,
+    parser.add_argument('--prop', type=float, default=0.2,
                         help='Proportion of train data for each class in per task')
     
     # #################### Nuisance variables  ####################
@@ -112,5 +112,4 @@ if __name__ == "__main__":
     sys.stdout = Logger(log_dir)
     args.exp_path = exp_path  # One experiment with multiple runs
     print(args)
-
     experiment_multiple_runs(args)
