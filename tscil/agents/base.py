@@ -18,7 +18,7 @@ from tscil.utils.utils import EarlyStopping, BinaryCrossEntropy
 from torch.optim import lr_scheduler
 import copy
 from tscil.utils.setup_elements import get_num_classes
-
+np.random.seed(argparse.Namespace.seed)
 
 class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
     def __init__(self, model: nn.Module, args: argparse.Namespace):
@@ -38,6 +38,7 @@ class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
         self.tsne = args.tsne
         self.cf_matrix = args.cf_matrix
         self.use_prototype = args.use_prototype
+        self.prop=args.prop
 
         # ZZ: Ignore these args for now
         self.buffer = None
@@ -106,12 +107,35 @@ class BaseLearner(nn.Module, metaclass=abc.ABCMeta):
     def learn_task(self, task):
         """
         Basic workflow for learning a task. For particular methods, this function will be overwritten.
+        Mini-Dataset is to save time in especially large datasets like grabmyo
         """
 
         (x_train, y_train), (x_val, y_val), _ = task
-
         self.before_task(y_train)
+        print(f"训练集比例：{self.args.prop}")
+        # ============================mini-Dataset============================
+        if self.args.prop!=1.0:
+            labels=np.unique(y_train)
+            # Average samples size for each label
+            L=int(x_train.shape[0]*self.args.prop/len(labels))
+            new_x_train,new_y_train = [],[]
 
+            for label in labels:
+                indices = np.where(y_train == label)[0]
+                
+                # if samples of the label are less than L, than choose all
+                # As the label in Benchmark are balanced, so this easy setting won't influence the result  
+                selected_indices = np.random.choice(indices, size=min(L, len(indices)), replace=False)
+                
+                new_x_train.append(x_train[selected_indices])
+                new_y_train.append(y_train[selected_indices])
+
+            x_train = np.concatenate(new_x_train, axis=0)
+            y_train = np.concatenate(new_y_train, axis=0)
+
+            print("mini-Dataset Size: ", x_train.shape[0])
+
+        
         if self.update_model:
             train_dataloader = Dataloader_from_numpy(x_train, y_train, self.batch_size, shuffle=True)
             val_dataloader = Dataloader_from_numpy(x_val, y_val, self.batch_size, shuffle=False)

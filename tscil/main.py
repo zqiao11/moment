@@ -59,7 +59,9 @@ if __name__ == "__main__":
     parser.add_argument('--patience', type=int, default=20)
     parser.add_argument('--weight_decay', dest='weight_decay', default=0, type=float, help='weight decay')
     parser.add_argument('--z_score_norm', type=boolean_string, default=False, help='conducting offline z score normalization')
-
+    parser.add_argument('--prop', type=float, default=1.0,
+                        help='Proportion of train data for each class in per task')
+    
     # #################### Nuisance variables  ####################
     parser.add_argument('--tune', type=boolean_string, default=False, help='flag of tuning')
     parser.add_argument('--debug', type=boolean_string, default=True,  help='flag of debugging') # will save the results in a 'debug' folder
